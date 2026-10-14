@@ -30,6 +30,14 @@ adb -s DEVICE_SERIAL shell am start -n ir.laptops.mobile/.MainActivity
 
 Debug builds use the developer machine's debug signing key. Keep that key for consistent local test updates. GitHub's APK artifact is a test build and uses the runner's key; it is not an upgrade channel for the separately signed local install. A production signing key must be configured before distributing release updates.
 
+## Minified release APK
+
+```bash
+./gradlew :app:assembleRelease -PuseInstalledSigningKey=true
+```
+
+This local upgrade command builds a non-debuggable release APK with R8 code minification and resource shrinking, signed with the same local key as the installed debug APK to preserve its data. Output: `app/build/outputs/apk/release/app-release.apk`. Production distribution should supply a dedicated signing configuration; the existing-key option is explicit, not the release default. R8 mapping is under `app/build/outputs/mapping/release/`.
+
 ## Verification
 
 Local Java tests cover patch merging, counter deltas, UUID normalization and secure endpoint validation. The HTTP integration test runs against a temporary loopback copy of the desktop server when `LAPTOPS_SERVER_SOURCE` points to its checkout with `.server-venv` installed. CI checks out the compatible desktop server tag solely for this test; no test accesses the live database.

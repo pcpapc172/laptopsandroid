@@ -17,7 +17,19 @@ android {
     buildFeatures { buildConfig true }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = '17' }
-    buildTypes { release { minifyEnabled false } }
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Explicit local upgrade build: keep the certificate of the installed test APK.
+            // Without this opt-in a separate production signing configuration is required.
+            if (providers.gradleProperty('useInstalledSigningKey').orNull == 'true') {
+                signingConfig signingConfigs.debug
+            }
+        }
+    }
 }
 dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20240303' }
 
