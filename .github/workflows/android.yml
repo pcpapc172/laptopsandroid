@@ -1,0 +1,45 @@
+name: Android build and tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: pcpapc172/laptops
+          ref: v4.0.0
+          path: backend
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Prepare isolated API fixture
+        run: |
+          python3 -m venv backend/.server-venv
+          backend/.server-venv/bin/pip install -r backend/server/requirements.lock
+      - name: Build and verify
+        env:
+          LAPTOPS_SERVER_SOURCE: ${{ github.workspace }}/backend
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LaptopManager-Android-test
+          path: app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android-test-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html
