@@ -1,6 +1,6 @@
 # Laptop Manager for Android
 
-A native Kotlin and Java phone client for [Laptop Manager](https://github.com/pcpapc172/laptops). Sign in with the **same server username and password** as the desktop app. The endpoint is `https://13.42.221.242`; the app uses the existing HTTPS API and does not require another server.
+A native Kotlin and Java phone client for [Laptop Manager](https://github.com/pcpapc172/laptops). Sign in with the **same server username and password** as the desktop app. The endpoint is `https://laptops.pcpapc172.ir`; the app uses the existing HTTPS API and does not require another server. If the direct domain cannot connect, it automatically tries `https://laptops-cf.pcpapc172.ir` (Cloudflare) using the same transaction payload. Both domains reach the same database.
 
 - Persian RTL layout, Vazir font, light/dark themes, bottom navigation and record cards.
 - Register laptop loans, select predefined teachers/grades, edit records and notes, receive returns, and search archived/history records.
@@ -55,3 +55,9 @@ adb -s DEVICE_SERIAL shell am instrument -w \
 The initial APK was installed on the connected Samsung SM-S711B via ADB. Five computer-side tests (including the API fixture) and four isolated on-phone tests passed. The standalone APK builds and Android lint passes. Later UI fixes add explicit teacher/grade selection buttons and light system-bar icons in dark mode; these fixes are compiled into the updated APK and are prepared without interrupting the user's running test session.
 
 See [sync and credentials](docs/sync.md) for storage and background behavior. Vazir's license is bundled under `app/src/main/assets/licenses/`.
+
+## 4.1.0 recovery migration
+
+The shared service moved to the domain after recovery from the phone/laptop caches. All 95 recovered loans (93 returned, two active), presets and deletion markers were verified. Server password hashes were unavailable; only the new administrator account is created initially. The administrator recreates other accounts. Existing device caches and pending work are retained; a changed server epoch requires a full refresh.
+
+Connection failure or HTTP 5xx on replay-safe operations retries once through the alternate domain. Authentication errors and rate limits are not retried across domains. TLS validation remains required for each host. User creation is not automatically replayed after an ambiguous response. The app keeps using the working fallback for 60 seconds before checking the direct route again.

@@ -9,22 +9,42 @@ import javax.net.ssl.SSLException;
 /** Platform HTTPS validation is retained; redirects and TLS bypasses are forbidden. */
 public final class Api {
     private final String endpoint;
+    private long fallbackUntil=0;
+    private String testFallback="";
     public Api(String endpoint) { this(endpoint,false); }
     Api(String endpoint,boolean loopbackTest) {
         URI uri=URI.create(endpoint);
         if(!"https".equals(uri.getScheme())&&!(loopbackTest&&"http".equals(uri.getScheme())&&"127.0.0.1".equals(uri.getHost())))throw new IllegalArgumentException("آدرس سرور باید HTTPS باشد.");
         this.endpoint=endpoint;
     }
+    Api(String primary,String fallback,boolean loopbackTest) {
+        this(primary,loopbackTest);
+        if(!loopbackTest||!"127.0.0.1".equals(URI.create(primary).getHost())||!"127.0.0.1".equals(URI.create(fallback).getHost()))throw new IllegalArgumentException("Loopback test only");
+        testFallback=fallback;
+    }
     public static final class Failure extends IOException {
         public final int status;public final boolean offlineEligible;
         Failure(int status,String message,boolean offlineEligible,Throwable cause){super(message,cause);this.status=status;this.offlineEligible=offlineEligible;}
     }
-    public Object request(String method,String path,JSONObject body,String token) throws IOException {
+    public synchronized Object request(String method,String path,JSONObject body,String token) throws IOException {
+        boolean managed=endpoint.equals("https://laptops.pcpapc172.ir")||endpoint.equals("https://laptops-cf.pcpapc172.ir");
+        String first=managed?(System.currentTimeMillis()<fallbackUntil?"https://laptops-cf.pcpapc172.ir":"https://laptops.pcpapc172.ir"):endpoint;
+        try {return requestAt(first,method,path,body,token);}catch(Failure error) {
+            boolean temporary=error.status==0||error.status>=500;
+            boolean replaySafe=method.equals("GET")||path.equals("/v1/login")||path.equals("/v1/batches")||path.equals("/v1/logout");
+            if((!managed&&testFallback.isEmpty())||!temporary||!replaySafe)throw error;
+            String alternate=!testFallback.isEmpty()?testFallback:first.equals("https://laptops.pcpapc172.ir")?"https://laptops-cf.pcpapc172.ir":"https://laptops.pcpapc172.ir";
+            Object response=requestAt(alternate,method,path,body,token);
+            fallbackUntil=alternate.equals("https://laptops-cf.pcpapc172.ir")?System.currentTimeMillis()+60000:0;
+            return response;
+        }
+    }
+    private Object requestAt(String origin,String method,String path,JSONObject body,String token) throws IOException {
         HttpURLConnection connection=null;
         try {
-            connection=(HttpURLConnection)new URL(endpoint+path).openConnection();
+            connection=(HttpURLConnection)new URL(origin+path).openConnection();
             connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(10000);connection.setReadTimeout(15000);connection.setRequestMethod(method);
-            connection.setRequestProperty("Content-Type","application/json");
+            connection.setRequestProperty("Content-Type","application/json");connection.setRequestProperty("User-Agent","LaptopManager/4.1.0");
             if(token!=null&&!token.isEmpty())connection.setRequestProperty("Authorization","Bearer "+token);
             if(!method.equals("GET")){connection.setDoOutput(true);byte[] bytes=(body==null?"{}":body.toString()).getBytes(StandardCharsets.UTF_8);connection.setFixedLengthStreamingMode(bytes.length);try(OutputStream out=connection.getOutputStream()){out.write(bytes);}}
             int code=connection.getResponseCode();InputStream stream=code>=200&&code<300?connection.getInputStream():connection.getErrorStream();

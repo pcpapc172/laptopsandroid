@@ -17,7 +17,11 @@ public class ApiIntegrationTest {
         try {
             Api api=new Api("http://127.0.0.1:"+port,true);long deadline=System.currentTimeMillis()+15000;boolean ready=false;
             while(System.currentTimeMillis()<deadline){try{api.object("GET","/health",null,"");ready=true;break;}catch(IOException pending){Thread.sleep(50);}}
-            assertTrue("fixture listener",ready);String device=Protocol.uuid();JSONObject auth=api.object("POST","/v1/login",Protocol.row("username","admin","password","integration-test-password","device_id",device),"");String token=auth.getString("token"),user=auth.getJSONObject("user").getString("id"),id=Protocol.uuid();assertEquals(1,auth.getInt("protocol"));
+            assertTrue("fixture listener",ready);
+            int unavailable;try(ServerSocket reservation=new ServerSocket(0)){unavailable=reservation.getLocalPort();}
+            Api failover=new Api("http://127.0.0.1:"+unavailable,"http://127.0.0.1:"+port,true);
+            assertEquals("ok",failover.object("GET","/health",null,"").getString("status"));
+            String device=Protocol.uuid();JSONObject auth=failover.object("POST","/v1/login",Protocol.row("username","admin","password","integration-test-password","device_id",device),"");String token=auth.getString("token"),user=auth.getJSONObject("user").getString("id"),id=Protocol.uuid();assertEquals(1,auth.getInt("protocol"));
             JSONObject loan=Protocol.row("bell_period",1,"grade_level","Grade","teacher_name","Teacher","recipient_name","Borrower","laptop_number","ANDROID-TEST","initial_condition","Healthy","return_condition",null,"returner_name",null,"lend_time",Protocol.now(),"return_time",null,"status","ACTIVE","notes","");
             JSONObject create=batch(user,device,Protocol.row("table","loans","entity_id",id,"before",null,"after",loan,"revision",0));JSONObject accepted=api.object("POST","/v1/batches",create,token);assertEquals("accepted",accepted.getString("status"));assertTrue(sameJson(accepted,api.object("POST","/v1/batches",create,token)));
             JSONObject peerEdit=Protocol.copy(loan).put("teacher_name","Other teacher").put("notes","Other note");assertEquals("accepted",api.object("POST","/v1/batches",batch(user,device,Protocol.row("table","loans","entity_id",id,"before",loan,"after",peerEdit,"revision",1)),token).getString("status"));
